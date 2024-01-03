@@ -1,17 +1,21 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-let modes = []
+const lineWidthElem = document.getElementById("lineWidth")
+const colorElem = document.getElementById("color")
+
+let modes = ["pencil", "rectangle", "circle", "line", "text", "erase"]
 let mode = "pencil"
 
 let isDrawing = false;
 let startX, startY;
 let prevX, prevY
+let curX, curY
 let drawings = []
-let rectangles = []
+let pencil_strokes = []
 
 document.addEventListener("click", e => {
-    if (e.srcElement.id != "canvas") {
+    if (modes.includes(e.srcElement.id)) {
         mode = e.srcElement.id
         console.log(mode);
     }
@@ -21,61 +25,65 @@ canvas.addEventListener('mousedown', (e) => {
     isDrawing = true;
     startX = e.clientX - canvas.getBoundingClientRect().left;
     startY = e.clientY - canvas.getBoundingClientRect().top;
+    curX = startX
+    curY = startY
 });
 
 canvas.addEventListener('mousemove', (e) => {
     if (!isDrawing) return;
-    const currentX = e.clientX - canvas.getBoundingClientRect().left;
-    const currentY = e.clientY - canvas.getBoundingClientRect().top;
+    prevX = curX
+    prevY = curY
+    curX = e.clientX - canvas.getBoundingClientRect().left;
+    curY = e.clientY - canvas.getBoundingClientRect().top;
 
-    ctx.beginPath()
-    ctx.moveTo(currentX, currentY)
-    ctx.lineTo(currentX + e.movementX, currentY + e.movementY)
-    ctx.stroke()
 
-    if (mode == "rectangle") {
 
-        const width = currentX - startX;
-        const height = currentY - startY;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        redraw()
-
-        rectDraw({ x: startX, y: startY, width, height });
-    } else if (mode == "circle") {
-        const dirX = currentX - startX
-        const dirY = currentY - startY
-        const radius = Math.sqrt(dirX * dirX + dirY * dirY)
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        redraw()
-
-        circleDraw({ x: startX, y: startY, radius })
-    } else if (mode == "line") {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        redraw()
-        lineDraw({ x1: startX, y1: startY, x2: currentX, y2: currentY })
+    switch (mode) {
+        case "pencil":
+            pencil_strokes.push({ prevX, prevY, curX, curY, lineWidth: lineWidthElem.value, color: colorElem.value })
+            pencilDraw({ prevX, prevY, curX, curY, lineWidth: lineWidthElem.value, color: colorElem.value })
+            break;
+        case "rectangle":
+            const width = curX - startX;
+            const height = curY - startY;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            rectDraw({ x: startX, y: startY, width, height, lineWidth: lineWidthElem.value, color: colorElem.value });
+            break;
+        case "circle":
+            const dirX = curX - startX
+            const dirY = curY - startY
+            const radius = Math.sqrt(dirX * dirX + dirY * dirY)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            circleDraw({ x: startX, y: startY, radius, lineWidth: lineWidthElem.value, color: colorElem.value })
+            break;
+        case "line":
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            lineDraw({ x1: startX, y1: startY, x2: curX, y2: curY, lineWidth: lineWidthElem.value, color: colorElem.value })
+            break;
+        default:
     }
+    redraw()
 });
 
 canvas.addEventListener('mouseup', (e) => {
-    const currentX = e.clientX - canvas.getBoundingClientRect().left;
-    const currentY = e.clientY - canvas.getBoundingClientRect().top;
-
     switch (mode) {
+        case "pencil":
+            drawings.push({ type: "pencil", strokes: pencil_strokes })
+            pencil_strokes = []
+            break;
         case "rectangle":
-            const width = currentX - startX;
-            const height = currentY - startY;
-            drawings.push({ type: "rectangle", args: { x: startX, y: startY, width, height } })
+            const width = curX - startX;
+            const height = curY - startY;
+            drawings.push({ type: "rectangle", args: { x: startX, y: startY, width, height, lineWidth: lineWidthElem.value, color: colorElem.value } })
             break;
         case "circle":
-            const dirX = currentX - startX
-            const dirY = currentY - startY
+            const dirX = curX - startX
+            const dirY = curY - startY
             const radius = Math.sqrt(dirX * dirX + dirY * dirY)
-            drawings.push({ type: "circle", args: { x: startX, y: startY, radius } })
+            drawings.push({ type: "circle", args: { x: startX, y: startY, radius, lineWidth: lineWidthElem.value, color: colorElem.value } })
             break;
         case "line":
-            drawings.push({ type: "line", args: { x1: startX, y1: startY, x2: currentX, y2: currentY } })
+            drawings.push({ type: "line", args: { x1: startX, y1: startY, x2: curX, y2: curY, lineWidth: lineWidthElem.value, color: colorElem.value } })
 
         default:
             break;
@@ -84,10 +92,15 @@ canvas.addEventListener('mouseup', (e) => {
 });
 
 function redraw() {
+    console.log(drawings);
     for (let i = 0; i < drawings.length; i++) {
         let drawing = drawings[i]
-        console.log(drawing);
         switch (drawing.type) {
+            case "pencil":
+                for (let i = 0; i < drawing.strokes.length; i++) {
+                    pencilDraw(drawing.strokes[i])
+                }
+                break;
             case "rectangle":
                 rectDraw(drawing.args)
                 break;
@@ -100,24 +113,36 @@ function redraw() {
     }
 }
 
-function rectDraw({ x, y, width, height }) {
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2;
+function rectDraw({ x, y, width, height, lineWidth, color }) {
+    ctx.lineWidth = lineWidth
+    ctx.strokeStyle = color
     ctx.strokeRect(x, y, width, height);
 }
 
 // Bug: Circle is drawn in the opposite dir
-function circleDraw({ x, y, radius }) {
+// Bug: Color is changing for last circle while drawing a new Circle
+function circleDraw({ x, y, radius, lineWidth, color }) {
     ctx.beginPath()
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = lineWidth
+    ctx.strokeStyle = color
     ctx.arc(x, y, radius, 0, Math.PI * 2, false)
     ctx.stroke()
 }
 
-function lineDraw({ x1, y1, x2, y2 }) {
+function lineDraw({ x1, y1, x2, y2, lineWidth, color }) {
     ctx.beginPath()
+    ctx.lineWidth = lineWidth
+    ctx.strokeStyle = color
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y2)
+    ctx.stroke()
+}
+
+function pencilDraw({ prevX, prevY, curX, curY, lineWidth, color }) {
+    ctx.beginPath()
+    ctx.lineWidth = lineWidth
+    ctx.strokeStyle = color
+    ctx.moveTo(prevX, prevY)
+    ctx.lineTo(curX, curY)
     ctx.stroke()
 }
