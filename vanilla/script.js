@@ -43,6 +43,10 @@ canvas.addEventListener('mousemove', (e) => {
             pencil_strokes.push({ prevX, prevY, curX, curY, lineWidth: lineWidthElem.value, color: colorElem.value })
             pencilDraw({ prevX, prevY, curX, curY, lineWidth: lineWidthElem.value, color: colorElem.value })
             break;
+        case "erase":
+            pencil_strokes.push({ prevX, prevY, curX, curY, lineWidth: lineWidthElem.value, color: 'white' })
+            pencilDraw({ prevX, prevY, curX, curY, lineWidth: lineWidthElem.value, color: 'white' })
+            break;
         case "rectangle":
             const width = curX - startX;
             const height = curY - startY;
@@ -71,6 +75,10 @@ canvas.addEventListener('mouseup', (e) => {
             drawings.push({ type: "pencil", strokes: pencil_strokes })
             pencil_strokes = []
             break;
+        case "erase":
+            drawings.push({ type: "erase", strokes: pencil_strokes })
+            pencil_strokes = []
+            break;
         case "rectangle":
             const width = curX - startX;
             const height = curY - startY;
@@ -97,7 +105,12 @@ function redraw() {
         let drawing = drawings[i]
         switch (drawing.type) {
             case "pencil":
-                for (let i = 0; i < drawing.strokes.length; i++) {
+                for (let i = drawing.strokes.length - 1; i >= 0; i++) {
+                    pencilDraw(drawing.strokes[i])
+                }
+                break;
+            case "erase":
+                for (let i = drawing.strokes.length - 1; i >= 0; i++) {
                     pencilDraw(drawing.strokes[i])
                 }
                 break;
