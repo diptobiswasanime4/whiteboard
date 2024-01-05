@@ -142,6 +142,8 @@ function pencilDraw({ prevX, prevY, curX, curY, lineWidth, color }) {
     ctx.beginPath()
     ctx.lineWidth = lineWidth
     ctx.strokeStyle = color
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
     ctx.moveTo(prevX, prevY)
     ctx.lineTo(curX, curY)
     ctx.stroke()
